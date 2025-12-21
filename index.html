@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX → LiaScript Konverter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .file-selector {
+            display: flex;
+            gap: 10px;
+        }
+
+        .file-selector input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .file-selector input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+            width: 100%;
+            padding: 16px;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-success:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .checkbox-item:hover {
+            background: #f3f4f6;
+            border-color: #667eea;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+            color: #374151;
+            user-select: none;
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e0;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+
+        .result-container {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .result-container.active {
+            display: block;
+        }
+
+        .result-container.success {
+            background: #d1fae5;
+            border: 2px solid #10b981;
+        }
+
+        .result-container.error {
+            background: #fee2e2;
+            border: 2px solid #ef4444;
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .result-container.success .result-title {
+            color: #065f46;
+        }
+
+        .result-container.error .result-title {
+            color: #991b1b;
+        }
+
+        .output-list {
+            list-style: none;
+            margin-top: 10px;
+        }
+
+        .output-list li {
+            padding: 8px;
+            background: white;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 LaTeX → LiaScript Konverter</h1>
+            <p>Automatische Konvertierung von LaTeX-Dokumenten zu LiaScript-Format</p>
+        </div>
+
+        <div class="content">
+            <!-- Dateiauswahl -->
+            <div class="section">
+                <div class="section-title">Quelldateien</div>
+
+                <div class="input-group">
+                    <label>LaTeX-Verzeichnis</label>
+                    <div class="file-selector">
+                        <input type="text" id="sourceDir" placeholder="Verzeichnis auswählen..." readonly>
+                        <button class="btn btn-secondary" onclick="selectDirectory()">Durchsuchen</button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Haupt-TeX-Datei (relativ zum Verzeichnis)</label>
+                    <input type="text" id="mainTexFile" placeholder="z.B. Kurs_1793.tex" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px;">
+                </div>
+
+                <div class="input-group">
+                    <label>Ausgabeverzeichnis</label>
+                    <div class="file-selector">
+                        <input type="text" id="outputDir" placeholder="Ausgabeverzeichnis auswählen..." readonly>
+                        <button class="btn btn-secondary" onclick="selectOutputDirectory()">Durchsuchen</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optionen -->
+            <div class="section">
+                <div class="section-title">Optionen</div>
+
+                <div class="toggle-switch">
+                    <label class="switch">
+                        <input type="checkbox" id="outputSteps">
+                        <span class="slider"></span>
+                    </label>
+                    <label for="outputSteps" style="cursor: pointer; flex: 1;">
+                        <strong>Zwischenschritte ausgeben</strong><br>
+                        <small style="color: #6b7280;">Speichert Zwischenergebnisse jedes Verarbeitungsschritts</small>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Verarbeitungsschritte -->
+            <div class="section">
+                <div class="section-title">Verarbeitungsschritte aktivieren</div>
+                <div class="checkbox-grid">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="step0" checked>
+                        <label for="step0">PDF Embedder</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="step1" checked>
+                        <label for="step1">Math Fixer</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="step2" checked>
+                        <label for="step2">Div-Blöcke fixen</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="step3" checked>
+                        <label for="step3">CodeRunner-Makros</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="step4" checked>
+                        <label for="step4">Fußnoten versetzen</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export-Formate -->
+            <div class="section">
+                <div class="section-title">Export-Formate</div>
+                <div class="checkbox-grid">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="export0" checked>
+                        <label for="export0">Markdown</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="export1" checked>
+                        <label for="export1">IMS Package</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="export2" checked>
+                        <label for="export2">SCORM 1.2</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="export3" checked>
+                        <label for="export3">SCORM 2004</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="export4" checked>
+                        <label for="export4">Website</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start-Button -->
+            <button class="btn btn-success" id="startBtn" onclick="startPipeline()">
+                ▶ Konvertierung starten
+            </button>
+
+            <!-- Fortschrittsanzeige -->
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Vorbereitung...</div>
+            </div>
+
+            <!-- Ergebnis -->
+            <div class="result-container" id="resultContainer">
+                <div class="result-title" id="resultTitle"></div>
+                <div id="resultMessage"></div>
+                <ul class="output-list" id="outputList"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="dist/renderer.js"></script>
+</body>
+</html>
