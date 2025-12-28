@@ -132,7 +132,8 @@ const BLOCK_TYPE_LABELS: { [key: string]: string } = {
 const BLOCKQUOTE_WITHOUT_LABEL = [
   'universalkasten',
   'tcolorbox',
-  'autorenkasten'
+  'autorenkasten',
+  'picture'
 ];
 
 /**
@@ -143,9 +144,7 @@ const SPECIAL_BLOCK_TYPES = [
   'sprachvgl',
   'experten',
   'exkurs',
-  'tcolorbox',
-  'definitionskasten',
-  'universalkasten'
+  'definitionskasten'
 ];
 
 /**

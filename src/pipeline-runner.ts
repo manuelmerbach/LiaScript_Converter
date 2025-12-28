@@ -9,7 +9,7 @@ import { exporter } from "./export/web";
 import { exporter as exporter_ims } from "./export/ims";
 import { exporter as exporter_scorm2004 } from "./export/scorm2004";
 import { exporter as exporter_scorm12 } from "./export/scorm12";
-import { preprocessLatexDirectory } from "./tex_preprocessor2";
+import { preprocessLatexDirectory } from "./tex_preprocessor2_modular"
 import { relocateFootnotes } from "./footnotes_shifter";
 import { fixMath } from "./math_fixer";
 import * as path from "path";

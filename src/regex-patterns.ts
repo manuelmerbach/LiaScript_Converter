@@ -176,65 +176,6 @@ export const universalkastenPattern: RegexPattern = {
   description: "Konvertiert \\sttpUniversalkasten in div-Block"
 };
 
-/*
-// \sttpExpertenwissen{skalierung}{inhalt}
-export const expertenwissenPattern: RegexPattern = {
-  name: "sttpExpertenwissen",
-  regex: /\\(sttpExpertenwissen)\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g,
-  replacement: (_m: string, _makro: string, _param1: string, param2: string) => {
-    let result = `\\begin{Expertenwissen}\n`;
-    result += `${param2}\n`;
-    result += `\\end{Expertenwissen}`;
-    return result;
-  },
-  description: "Konvertiert \\sttpExpertenwissen in div-Block"
-};
-
-
-// \sttpSprachvergleichskasten{skalierung}{überschrift}{inhalt}
-export const sprachvergleichskastenPattern: RegexPattern = {
-  name: "sttpSprachvergleichskasten",
-  regex: /\\(sttpSprachvergleichskasten)\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g,
-  replacement: (_m: string, _makro: string, _param1: string, param2: string, param3: string) => {
-    let result = `\\begin{Sprachvergleichskasten}\n`;
-    result += `\\textbf{\\emph{${param2}}}\n\n`;
-    result += `${param3}\n`;
-    result += `\\end{Sprachvergleichskasten}`;
-    return result;
-  },
-  description: "Konvertiert \\sttpSprachvergleichskasten in div-Block"
-};
-
-// \sttpHinweis{skalierung}{überschrift}{inhalt}
-export const hinweisPattern: RegexPattern = {
-  name: "sttpHinweis",
-  regex: /\\(sttpHinweis)\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g,
-  replacement: (_m: string, _makro: string, _param1: string, param2: string, param3: string) => {
-    let result = `\\begin{Hinweis}\n`;
-    result += `\\textbf{\\emph{${param2}}}\n\n`;
-    result += `${param3}\n`;
-    result += `\\end{Hinweis}`;
-    return result;
-  },
-  description: "Konvertiert \\sttpHinweis in div-Block"
-};
-
-// \sttpExkurs{skalierung}{überschrift}{inhalt}
-export const exkursPattern: RegexPattern = {
-  name: "sttpExkurs",
-  regex: /\\(sttpExkurs)\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g,
-  replacement: (_m: string, _makro: string, _param1: string, param2: string, param3: string) => {
-    let result = `\\begin{Exkurs}\n`;
-    result += `\\textbf{\\emph{${param2}}}\n\n`;
-    result += `${param3}\n`;
-    result += `\\end{Exkurs}`;
-    return result;
-  },
-  description: "Konvertiert \\sttpExkurs in div-Block"
-};
-*/
-
-
 /**
  * \sttpAutorenkasten{Name des Autors}{Geburtsjahr}{Todesjahr}{Erweiterter Text}{Bild}{Jahr der Aufnahme}{Quellenangabe}
  */
@@ -284,11 +225,8 @@ export const tcolorboxPatterns: RegexPattern[] = [
   tcolorboxPattern,
   definitionskastenPattern,
   universalkastenPattern,
-  //expertenwissenPattern,
-  //exkursPattern,
   autorenkastenPattern
-  //sprachvergleichskastenPattern,
-  //hinweisPattern
+
 ];
 
 /**
@@ -317,25 +255,4 @@ export const inputReplacements: RegexPattern[] = [
     replacement: "% config_listings.tex not found - skipped by preprocessor",
     description: "Ersetzt \\input{config_listings} durch Kommentar"
   }
-  // Weitere Input-Ersetzungen können hier hinzugefügt werden:
-  /*
-  {
-    name: "declarations",
-    regex: /\\input\{declarations(\.tex)?\}/g,
-    replacement: "% declarations.tex not found - skipped by preprocessor",
-    description: "Ersetzt \\input{declarations} durch Kommentar"
-  },
-  {
-    name: "config_mdframed",
-    regex: /\\input\{config_mdframed(\.tex)?\}/g,
-    replacement: "% config_mdframed.tex not found - skipped by preprocessor",
-    description: "Ersetzt \\input{config_mdframed} durch Kommentar"
-  },
-  {
-    name: "macros",
-    regex: /\\input\{macros\}/g,
-    replacement: "% macros.tex not found - skipped by preprocessor",
-    description: "Ersetzt \\input{macros} durch Kommentar"
-  }
-  */
 ];

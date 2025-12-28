@@ -18,27 +18,46 @@ export interface TextMacro {
  * Neue Makros können hier einfach hinzugefügt werden
  */
 export const textMacros: TextMacro[] = [
+  // === Logische Operatoren (als Math-Inline-Code) ===
+  {
+    name: "notOp",
+    regex: /\\notOp\b/g,
+    replacement: "$\\text{NOT}$",
+    description: "Ersetzt \\notOp durch Math-Inline: $\\text{NOT}$"
+  },
+  {
+    name: "andOp",
+    regex: /\\andOp\b/g,
+    replacement: "$\\text{AND}$",
+    description: "Ersetzt \\andOp durch Math-Inline: $\\text{AND}$"
+  },
+  {
+    name: "orOp",
+    regex: /\\orOp\b/g,
+    replacement: "$\\text{OR}$",
+    description: "Ersetzt \\orOp durch Math-Inline: $\\text{OR}$"
+  },
+  {
+    name: "xorOp",
+    regex: /\\xorOp\b/g,
+    replacement: "$\\text{XOR}$",
+    description: "Ersetzt \\xorOp durch Math-Inline: $\\text{XOR}$"
+  },
+  {
+    name: "andnotOp",
+    regex: /\\andnotOp\b/g,
+    replacement: "$\\text{AND NOT}$",
+    description: "Ersetzt \\andnotOp durch Math-Inline: $\\text{AND NOT}$"
+  },
+  // /sog steht in den meisten Fällen vor einer kursiven Formatierung (/emph{...}), wodurch in Markdown keine Leerzeile dazwischen entsteht. Andernfalls entsteht eine doppelte Leerzeile die in Markdown ignoriert wird.
   {
     name: "sog",
-    regex: /\\sog\s*/g,
+    regex: /\\sog\b/g,
     replacement: "sog. ",
-    description: "Ersetzt \\sog durch 'sog. '"
-  },
-  {
-    name: "dH",
-    regex: /\\dH\b/g,
-    replacement: "d. h.",
-    description: "Ersetzt \\dH durch 'd. h.'"
+    description: "Ersetzt \\bzw durch 'bzw.'"
   }
-  
-  // Weitere Textmakros können hier hinzugefügt werden:
+
   /*
-  {
-    name: "zB",
-    regex: /\\zB\b/g,
-    replacement: "z. B.",
-    description: "Ersetzt \\zB durch 'z. B.'"
-  },
   {
     name: "bzw",
     regex: /\\bzw\b/g,
