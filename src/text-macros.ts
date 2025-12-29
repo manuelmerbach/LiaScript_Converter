@@ -49,52 +49,14 @@ export const textMacros: TextMacro[] = [
     replacement: "$\\text{AND NOT}$",
     description: "Ersetzt \\andnotOp durch Math-Inline: $\\text{AND NOT}$"
   },
-  // /sog steht in den meisten Fällen vor einer kursiven Formatierung (/emph{...}), wodurch in Markdown keine Leerzeile dazwischen entsteht. Andernfalls entsteht eine doppelte Leerzeile die in Markdown ignoriert wird.
+  // \sog steht in den meisten Fällen vor einer kursiven Formatierung (\emph{...}), wodurch in Markdown keine Leerzeile dazwischen entsteht. 
+  // Andernfalls entsteht eine doppelte Leerzeile die in Markdown ignoriert wird.
   {
     name: "sog",
     regex: /\\sog\b/g,
     replacement: "sog. ",
-    description: "Ersetzt \\bzw durch 'bzw.'"
-  }
-
-  /*
-  {
-    name: "bzw",
-    regex: /\\bzw\b/g,
-    replacement: "bzw.",
-    description: "Ersetzt \\bzw durch 'bzw.'"
+    description: "Ersetzt \sog durch 'sog. '"
   },
-  {
-    name: "etc",
-    regex: /\\etc\b/g,
-    replacement: "etc.",
-    description: "Ersetzt \\etc durch 'etc.'"
-  },
-  {
-    name: "usw",
-    regex: /\\usw\b/g,
-    replacement: "usw.",
-    description: "Ersetzt \\usw durch 'usw.'"
-  },
-  {
-    name: "vgl",
-    regex: /\\vgl\b/g,
-    replacement: "vgl.",
-    description: "Ersetzt \\vgl durch 'vgl.'"
-  },
-  {
-    name: "ggf",
-    regex: /\\ggf\b/g,
-    replacement: "ggf.",
-    description: "Ersetzt \\ggf durch 'ggf.'"
-  },
-  {
-    name: "evtl",
-    regex: /\\evtl\b/g,
-    replacement: "evtl.",
-    description: "Ersetzt \\evtl durch 'evtl.'"
-  }
-  */
 ];
 
 /**

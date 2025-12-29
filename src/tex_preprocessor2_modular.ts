@@ -1,19 +1,8 @@
 import fs from "fs";
 import path from "path";
-import {
-  getAllPatterns,
-  simpleMacroReplacements,
-  beginEnvironmentPatterns,
-  tcolorboxPatterns,
-  adjIncludeGraphicsPattern,
-  inputReplacements,
-  specialPatterns,
-  type RegexPattern,
-  liwrPattern,
-  liwrOptionalPattern
-} from "./regex-patterns-modular";
+import { getAllPatterns } from "./regex-patterns-modular";
 import { textMacros } from "./text-macros";
-import { isFileExcluded, getExclusionInfo } from "./excluded-files";
+import { getExclusionInfo } from "./excluded-files";
 
 interface ProcessingStats {
   filesProcessed: number;
@@ -23,15 +12,15 @@ interface ProcessingStats {
 }
 
 /**
- * Führt Preprocessing für LaTeX-Dateien durch mit dem neuen modularen System
+ * Führt Preprocessing für LaTeX-Dateien durch
  */
 function preprocessLatex(content: string): { processed: string; replacements: number } {
   let output = content;
   let replacements = 0;
 
-  // Hole alle generierten Patterns
+  // Hole alle Patterns
   const patterns = getAllPatterns();
-/*
+
   // 1. --- Entferne \textrm{...} und behalte nur den Inhalt ---
   const textrm_regex = patterns.special.textrm;
   let textrm_match: RegExpExecArray | null;
@@ -61,7 +50,36 @@ function preprocessLatex(content: string): { processed: string; replacements: nu
       console.warn("Ungeschlossenes \\textrm ab Position", textrm_match.index);
     }
   }
-    */
+
+  // 1b. --- Entferne \noindent{...} und behalte nur den Inhalt --- http://www.weinelt.de/latex/noindent.html
+const noindent_regex = /\\noindent\s*\{/g;
+let noindent_match: RegExpExecArray | null;
+
+while ((noindent_match = noindent_regex.exec(output)) !== null) {
+  const startIndex = noindent_match.index + noindent_match[0].length;
+  let braceCount = 1;
+  let pos = startIndex;
+  let content = "";
+
+  while (pos < output.length && braceCount > 0) {
+    const char = output[pos];
+    if (char === "{") braceCount++;
+    else if (char === "}") braceCount--;
+    if (braceCount > 0) content += char;
+    pos++;
+  }
+
+  if (braceCount === 0) {
+    output =
+      output.substring(0, noindent_match.index) +
+      content +
+      output.substring(pos);
+    noindent_regex.lastIndex = noindent_match.index;
+    replacements++;
+  } else {
+    console.warn("Ungeschlossenes \\noindent{ ab Position", noindent_match.index);
+  }
+}
 
   // 2. --- Wende einfache Makro-Ersetzungen an ---
   for (const pattern of patterns.simpleMacros) {
@@ -98,9 +116,9 @@ function preprocessLatex(content: string): { processed: string; replacements: nu
   // 5. --- adjincludegraphics-Ersetzung ---
   output = output.replace(patterns.adjIncludeGraphics.regex, patterns.adjIncludeGraphics.replacement as any);
 
-  // 5. --- liwr Ersetzung ---
-  output = output.replace(liwrOptionalPattern.regex, liwrOptionalPattern.replacement as any);
-  output = output.replace(liwrPattern.regex, liwrPattern.replacement as any);
+  // 5.1 --- liwr Ersetzung ---
+  output = output.replace(patterns.liwrOptional.regex, patterns.liwrOptional.replacement as any);
+  output = output.replace(patterns.liwr.regex, patterns.liwr.replacement as any);
   
   // 6. --- Environment-Patterns (mit optionalen Parametern) ---
   for (const pattern of patterns.environments) {
@@ -151,7 +169,6 @@ function preprocessLatex(content: string): { processed: string; replacements: nu
   }
 
   // 8. --- sttpKommLitItem - benötigt spezielle Verarbeitung ---
-  let kommLitIndex = 0;
   const kommLitRegex = /\\sttpKommLitItem/g;
   let kommLitMatch: RegExpExecArray | null;
 
@@ -390,7 +407,7 @@ function preprocessTexFile(filePath: string): number {
       }
       content = content.replace(pattern.regex, pattern.replacement as string);
     }
-      
+    
     // Nach einer Änderung speichern
     if (content !== originalContent) {
       fs.writeFileSync(filePath, content, "utf8");
@@ -467,38 +484,20 @@ export function preprocessLatexDirectory(
   return stats;
 }
 
-/**
- * Einzeldatei-Helfer
- */
-export function preprocessSingleLatexFile(filePath: string): void {
-  if (isFileExcluded(filePath)) {
-    console.log(`⊘ Datei übersprungen (ausgeschlossen): ${filePath}`);
-    return;
-  }
-  
-  try {
-    const replacements = preprocessTexFile(filePath);
-    console.log(`✓ ${filePath} verarbeitet (${replacements} Ersetzungen)`);
-  } catch (error) {
-    console.error(`❌ Fehler beim Verarbeiten von ${filePath}:`, error);
-    throw error;
-  }
-}
-
-// Direkter Testlauf
+// Direkter Aufruf für Tests
 function main(): void {
   const inputDirectory = "C:\\Uni\\FinalApp\\Input\\Kurstext_Go_Merbach";
 
-  console.log("🚀 Starte LaTeX Preprocessing (Modulares System)...\n");
+  console.log("Starte LaTeX Preprocessing (Modulares System)...\n");
 
   try {
     const stats = preprocessLatexDirectory(inputDirectory, {
       verbose: true,
     });
-    console.log("\n🎉 Preprocessing abgeschlossen!");
-    console.log("Jetzt kannst du Pandoc ausführen.");
+    console.log("\n Preprocessing abgeschlossen!");
+    console.log("Pandoc kann jetzt ausgeführt werden");
   } catch (error) {
-    console.error("💥 Fehler beim Preprocessing:", error);
+    console.error("Fehler beim Preprocessing:", error);
   }
 }
 

@@ -42,19 +42,6 @@ const FORMAT_TO_LATEX: Record<FormatType, string> = {
   [FormatType.CONTENT]: "$1",
 };
 
-/**
- * Mapping von FormatType zu Markdown (zur Info/Dokumentation)
- */
-const FORMAT_TO_MARKDOWN: Record<FormatType, string> = {
-  [FormatType.BOLD]: "**$1**",
-  [FormatType.ITALIC]: "*$1*",
-  [FormatType.BOLD_ITALIC]: "***$1***",
-  [FormatType.CODE]: "`$1`",
-  [FormatType.MATH_INLINE]: "$$$1$$",
-  [FormatType.REMOVE]: "",
-  [FormatType.CONTENT]: "$1",
-};
-
 // ============================================================================
 // EINFACHE MAKRO-ERSETZUNGEN
 // ============================================================================
@@ -73,16 +60,14 @@ export interface SimpleMacroConfig {
 }
 
 /**
- * Konfiguration aller einfachen Makro-Ersetzungen
- * 
- * Hier können neue Makros einfach hinzugefügt werden:
- * { macro: "meinMakro", targetFormat: FormatType.BOLD }
+ * Konfiguration einfacher Makro-Ersetzungen
+ * { macro: "meinMakro", targetFormat: FormatType.XXX, description: "Beschreibung" }
  */
 export const SIMPLE_MACRO_CONFIGS: SimpleMacroConfig[] = [
   // Inline-Code Makros
   { macro: "ffc", targetFormat: FormatType.CODE, description: "Hervorhebung von Zeichen" },
   { macro: "fftt", targetFormat: FormatType.CODE, description: "Hervorhebung von Zeichen" },
-  { macro: "ausgabeInline", targetFormat: FormatType.CODE, description: "Codebeispiele" },
+  { macro: "ausgabeInline", targetFormat: FormatType.CODE, description: "Programmierbeispiele" },
 ];
 
 /**
@@ -130,47 +115,6 @@ export interface MultiParamMacroConfig {
  */
 export const MULTI_PARAM_MACRO_CONFIGS: MultiParamMacroConfig[] = [
   // Deutsch-Englische Begriffspaare
-  /*
-  {
-    macro: "emphp",
-    paramCount: 2,
-    paramFormats: [FormatType.ITALIC, FormatType.ITALIC],
-    separators: [" ("],  // Nach param1: " ("
-    wrapper: { before: "", after: ")" },
-    description: "Emphasize pair: #1 (#2) - beide nur in Text"
-  },
-  {
-    macro: "emphpi",
-    paramCount: 2,
-    paramFormats: [FormatType.ITALIC, FormatType.ITALIC],
-    separators: [" ("],  // Nach param1: " ("
-    wrapper: { before: "", after: ")" },
-    description: "Emphasize pair with index - beide in Text und Index"
-  },
-  {
-    macro: "emphpimd",
-    paramCount: 2,
-    paramFormats: [FormatType.ITALIC, FormatType.ITALIC],
-    separators: [" ("],  // Nach param1: " ("
-    wrapper: { before: "", after: ")" },
-    description: "Emphasize pair with index and margin (D) - beide in Text und Index, D in Marginalie"
-  },
-  {
-    macro: "emphpimde",
-    paramCount: 2,
-    paramFormats: [FormatType.ITALIC, FormatType.ITALIC],
-    separators: [" ("],  // Nach param1: " ("
-    wrapper: { before: "", after: ")" },
-    description: "Emphasize pair with index and margin (D+E) - beide in Text und Index, D und E in Marginalie"
-  },
-  {
-    macro: "emphpmd",
-    paramCount: 2,
-    paramFormats: [FormatType.ITALIC, FormatType.ITALIC],
-    separators: [" ("],  // Nach param1: " ("
-    wrapper: { before: "", after: ")" },
-    description: "Emphasize pair with margin (D only) - beide in Text, nur D in Marginalie"
-  }, */
    {
     macro: "ntpimde",
     paramCount: 2,
@@ -496,12 +440,6 @@ export const inputReplacements: RegexPattern[] = [
     replacement: "% config_listings.tex not found - skipped by preprocessor",
     description: "Ersetzt \\input{config_listings} durch Kommentar"
   },
-  {
-    name: "noindent_with_braces",
-    regex: /\\noindent\{/g,
-    replacement: "{\\noindent ",
-    description: "Korrigiert \\noindent{ zu {\\noindent (Pandoc-kompatibel)"
-  }
 ];
 
 // ============================================================================
@@ -527,8 +465,3 @@ export function getAllPatterns() {
     inputReplacements: inputReplacements
   };
 }
-
-// Für Backward-Kompatibilität
-export const simpleMacroReplacements = generateSimpleMacroPatterns();
-export const beginEnvironmentPatterns = generateEnvironmentPatterns();
-export const tcolorboxPatterns = generateDivBoxPatterns();
