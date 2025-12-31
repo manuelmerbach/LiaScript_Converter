@@ -1,10 +1,12 @@
 /**
- * Eigene Textmakros für die LaTeX-Vorverarbeitung
+ * Textmakros-Loader für JSON-Konfiguration
  * 
- * Diese Datei enthält benutzerdefinierte Textmakros, die einfache
- * Textersetzungen durchführen. Neue Makros können hier problemlos
- * hinzugefügt werden.
+ * Diese Datei ersetzt text-macros.ts und lädt die Makros aus text-macros.json.
+ * Die API bleibt identisch: export const textMacros und export function applyTextMacros()
  */
+
+import fs from "fs";
+import path from "path";
 
 export interface TextMacro {
   name: string;
@@ -13,54 +15,64 @@ export interface TextMacro {
   description?: string;
 }
 
+interface TextMacroJSON {
+  name: string;
+  regex: string;
+  flags: string;
+  replacement: string;
+  description?: string;
+}
+
+interface CategoryGroup {
+  category: string;
+  macros: TextMacroJSON[];
+}
+
+interface TextMacrosConfig {
+  textMacros: CategoryGroup[];
+}
+
 /**
- * Liste aller Textmakros
- * Neue Makros können hier einfach hinzugefügt werden
+ * Lädt Textmakros aus einer JSON-Datei und konvertiert sie in TextMacro[]
  */
-export const textMacros: TextMacro[] = [
-  // === Logische Operatoren (als Math-Inline-Code) ===
-  {
-    name: "notOp",
-    regex: /\\notOp\b/g,
-    replacement: "$\\text{NOT}$",
-    description: "Ersetzt \\notOp durch Math-Inline: $\\text{NOT}$"
-  },
-  {
-    name: "andOp",
-    regex: /\\andOp\b/g,
-    replacement: "$\\text{AND}$",
-    description: "Ersetzt \\andOp durch Math-Inline: $\\text{AND}$"
-  },
-  {
-    name: "orOp",
-    regex: /\\orOp\b/g,
-    replacement: "$\\text{OR}$",
-    description: "Ersetzt \\orOp durch Math-Inline: $\\text{OR}$"
-  },
-  {
-    name: "xorOp",
-    regex: /\\xorOp\b/g,
-    replacement: "$\\text{XOR}$",
-    description: "Ersetzt \\xorOp durch Math-Inline: $\\text{XOR}$"
-  },
-  {
-    name: "andnotOp",
-    regex: /\\andnotOp\b/g,
-    replacement: "$\\text{AND NOT}$",
-    description: "Ersetzt \\andnotOp durch Math-Inline: $\\text{AND NOT}$"
-  },
-  // \sog steht in den meisten Fällen vor einer kursiven Formatierung (\emph{...}), wodurch in Markdown keine Leerzeile dazwischen entsteht. 
-  // Andernfalls entsteht eine doppelte Leerzeile die in Markdown ignoriert wird.
-  {
-    name: "sog",
-    regex: /\\sog\b/g,
-    replacement: "sog. ",
-    description: "Ersetzt \sog durch 'sog. '"
-  },
-];
+function loadTextMacrosFromJSON(jsonPath: string): TextMacro[] {
+  try {
+    const jsonContent = fs.readFileSync(jsonPath, "utf8");
+    const config: TextMacrosConfig = JSON.parse(jsonContent);
+    
+    // Flatten: Alle Makros aus allen Kategorien sammeln
+    const allMacros: TextMacro[] = [];
+    
+    for (const categoryGroup of config.textMacros) {
+      for (const macro of categoryGroup.macros) {
+        allMacros.push({
+          name: macro.name,
+          regex: new RegExp(macro.regex, macro.flags),
+          replacement: macro.replacement,
+          description: macro.description
+        });
+      }
+    }
+    
+    return allMacros;
+  } catch (error) {
+    console.error(`Fehler beim Laden der text-macros.json: ${error}`);
+    throw error;
+  }
+}
+
+// Lade Makros aus JSON-Datei (im gleichen Verzeichnis)
+const jsonPath = path.join(__dirname, "..", "src", "text-macros.json");
+
+/**
+ * Export der Textmakros - identisch zur alten API
+ * Kann direkt als Drop-in Replacement verwendet werden
+ */
+export const textMacros: TextMacro[] = loadTextMacrosFromJSON(jsonPath);
 
 /**
  * Wendet alle Textmakros auf einen String an
+ * Diese Funktion ist optional - wird aktuell nicht im Preprocessor verwendet
  */
 export function applyTextMacros(content: string): { processed: string; count: number } {
   let output = content;
@@ -69,8 +81,7 @@ export function applyTextMacros(content: string): { processed: string; count: nu
   for (const macro of textMacros) {
     const beforeLength = output.length;
     output = output.replace(macro.regex, macro.replacement);
-    // Zähle Ersetzungen (annähernd, basierend auf Längenänderung)
-    if (output !== content) {
+    if (output.length !== beforeLength) {
       count++;
     }
   }

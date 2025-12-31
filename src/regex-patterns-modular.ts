@@ -1,8 +1,11 @@
 /**
  * Modulare Regex-Muster für die LaTeX-Vorverarbeitung
  * 
- * Dieses System ermöglicht einfache, konfigurierbare Ersetzungen
- * ohne für jedes Makro ein eigenes Pattern schreiben zu müssen.
+ * HINWEIS: SimpleMacros und MultiParamMacros wurden zu text-macros.ts migriert.
+ * Diese Datei enthält jetzt nur noch:
+ * - Umgebungen (Environments) mit optionalen Parametern
+ * - Komplexe div-Boxen (DivBoxes) mit mehreren Parametern
+ * - Spezielle Patterns für Brace-Counting im Preprocessor
  */
 
 export interface RegexPattern {
@@ -13,251 +16,38 @@ export interface RegexPattern {
 }
 
 // ============================================================================
-// FORMATIERUNGSTYPEN
-// ============================================================================
-
-/**
- * Verfügbare Formatierungstypen für LaTeX → Markdown Konvertierung
- */
-export enum FormatType {
-  BOLD = "bold",                    // \textbf{...}  → **...**
-  ITALIC = "italic",                // \emph{...}    → *...*
-  BOLD_ITALIC = "bold_italic",      // \textbf{\emph{...}} → ***...***
-  CODE = "code",                    // \texttt{...}  → `...`
-  MATH_INLINE = "math_inline",      // $...$         → Math-Modus
-  REMOVE = "remove",                // (leer)        → Inhalt wird entfernt
-  CONTENT = "content",              // Nur Inhalt, keine Formatierung
-}
-
-/**
- * Mapping von FormatType zu LaTeX-Befehl
- */
-const FORMAT_TO_LATEX: Record<FormatType, string> = {
-  [FormatType.BOLD]: "\\textbf{$1}",
-  [FormatType.ITALIC]: "\\emph{$1}",
-  [FormatType.BOLD_ITALIC]: "\\textbf{\\emph{$1}}",
-  [FormatType.CODE]: "\\texttt{$1}",
-  [FormatType.MATH_INLINE]: "$$$1$$",
-  [FormatType.REMOVE]: "",
-  [FormatType.CONTENT]: "$1",
-};
-
-// ============================================================================
-// EINFACHE MAKRO-ERSETZUNGEN
-// ============================================================================
-
-/**
- * Definition für einfache Makro-Ersetzungen
- * Format: \makroName{inhalt} → formatiert nach targetFormat
- */
-export interface SimpleMacroConfig {
-  /** Name des LaTeX-Makros (ohne Backslash) */
-  macro: string;
-  /** Ziel-Formatierung */
-  targetFormat: FormatType;
-  /** Optionale Beschreibung */
-  description?: string;
-}
-
-/**
- * Konfiguration einfacher Makro-Ersetzungen
- * { macro: "meinMakro", targetFormat: FormatType.XXX, description: "Beschreibung" }
- */
-export const SIMPLE_MACRO_CONFIGS: SimpleMacroConfig[] = [
-  // Inline-Code Makros
-  { macro: "ffc", targetFormat: FormatType.CODE, description: "Hervorhebung von Zeichen" },
-  { macro: "fftt", targetFormat: FormatType.CODE, description: "Hervorhebung von Zeichen" },
-  { macro: "ausgabeInline", targetFormat: FormatType.CODE, description: "Programmierbeispiele" },
-];
-
-/**
- * Generiert RegexPattern-Objekte aus SimpleMacroConfig
- */
-export function generateSimpleMacroPatterns(): RegexPattern[] {
-  return SIMPLE_MACRO_CONFIGS.map(config => ({
-    name: config.macro,
-    regex: new RegExp(`\\\\${config.macro}\\{([^}]*)\\}`, 'g'),
-    replacement: FORMAT_TO_LATEX[config.targetFormat],
-    description: config.description || `Ersetzt \\${config.macro}{} durch ${config.targetFormat}`
-  }));
-}
-
-// ============================================================================
-// VERSCHACHTELTE MAKROS (MIT MEHREREN PARAMETERN)
-// ============================================================================
-
-/**
- * Definition für Makros mit mehreren Parametern
- * Format: \makroName{p1}{p2}{p3} → kombinierte Formatierung
- */
-export interface MultiParamMacroConfig {
-  /** Name des LaTeX-Makros (ohne Backslash) */
-  macro: string;
-  /** Anzahl der Parameter */
-  paramCount: number;
-  /** Formatierung für jeden Parameter (Index = Parameter-Nummer - 1) */
-  paramFormats: FormatType[];
-  /** 
-   * Optional: Trennzeichen nach jedem Parameter
-   * Array mit n-1 Elementen für n Parameter
-   * separators[0] kommt zwischen param1 und param2
-   * separators[1] kommt zwischen param2 und param3, etc.
-   */
-  separators?: string[];
-  /** Optional: Umschließende Struktur */
-  wrapper?: { before: string; after: string };
-  /** Optionale Beschreibung */
-  description?: string;
-}
-
-/**
- * Konfiguration für Makros mit mehreren Parametern
- */
-export const MULTI_PARAM_MACRO_CONFIGS: MultiParamMacroConfig[] = [
-  // Deutsch-Englische Begriffspaare
-   {
-    macro: "ntpimde",
-    paramCount: 2,
-    paramFormats: [FormatType.REMOVE, FormatType.REMOVE],
-    description: "Entfernt Seitenzeile"
-  },
-  {
-    macro: "ntpimd",
-    paramCount: 2,
-    paramFormats: [FormatType.REMOVE, FormatType.REMOVE],
-    description: "Entfernt Seitenzeile"
-  }
-];
-
-/**
- * Generiert RegexPattern für Multi-Parameter-Makros
- */
-export function generateMultiParamPatterns(): RegexPattern[] {
-  return MULTI_PARAM_MACRO_CONFIGS.map(config => {
-    // Erstelle Regex für n Parameter: \makro{p1}{p2}...{pn}
-    const paramRegex = Array(config.paramCount).fill('\\{([^}]*)\\}').join('\\s*');
-    const regex = new RegExp(`\\\\${config.macro}${paramRegex}`, 'g');
-    
-    return {
-      name: config.macro,
-      regex,
-      replacement: (_match: string, ...params: string[]) => {
-        const formattedParams = params
-          .slice(0, config.paramCount)
-          .map((param, idx) => {
-            const format = config.paramFormats[idx] || FormatType.CONTENT;
-            return FORMAT_TO_LATEX[format].replace('$1', param);
-          });
-        
-        // Baue das Ergebnis mit individuellen Separatoren auf
-        let result = '';
-        for (let i = 0; i < formattedParams.length; i++) {
-          result += formattedParams[i];
-          
-          // Füge Separator nach diesem Parameter hinzu (wenn vorhanden)
-          if (config.separators && i < config.separators.length) {
-            result += config.separators[i] || '';
-          }
-        }
-        
-        if (config.wrapper) {
-          result = config.wrapper.before + result + config.wrapper.after;
-        }
-        
-        return result;
-      },
-      description: config.description || `Konvertiert \\${config.macro} mit ${config.paramCount} Parametern`
-    };
-  });
-}
-
-// ============================================================================
 // UMGEBUNGEN (ENVIRONMENTS → DIV-BLÖCKE)
 // ============================================================================
 
 /**
- * Definition für LaTeX-Umgebungen die zu div-Blöcken werden
+ * Liste aller Environments die einen optionalen Titel-Parameter haben
+ * Format: \begin{envName}[Titel] → \begin{envName}\n\textbf{\emph{Titel}}\\\\
  */
-export interface EnvironmentConfig {
-  /** Name der LaTeX-Umgebung */
-  envName: string;
-  
-  /** Name der Ziel-Umgebung (für Pandoc div) */
-  targetEnvName?: string;
-  
-  /** Verarbeitung des optionalen Parameters [...] */
-  optionalParam?: {
-    /** Formatierung des Parameters */
-    format: FormatType;
-    /** Trennzeichen nach dem Parameter (z.B. "\\\\\\\\" für Zeilenumbruch) */
-    separator?: string;
-  };
-  
-  /** Optionale Beschreibung */
-  description?: string;
-}
-
-/**
- * Konfiguration aller Umgebungen
- * 
- * Neue Umgebungen können hier einfach hinzugefügt werden:
- * { envName: "meineBox", optionalParam: { format: FormatType.BOLD_ITALIC } }
- */
-export const ENVIRONMENT_CONFIGS: EnvironmentConfig[] = [
-  {
-    envName: "hinweis",
-    optionalParam: { format: FormatType.BOLD_ITALIC, separator: "\\\\\\\\" },
-    description: "Hinweis-Box mit optionalem Titel"
-  },
-  {
-    envName: "sprachvgl",
-    optionalParam: { format: FormatType.BOLD_ITALIC, separator: "\\\\\\\\" },
-    description: "Sprachvergleich-Box mit optionalem Titel"
-  },
-  {
-    envName: "experten",
-    optionalParam: { format: FormatType.BOLD_ITALIC, separator: "\\\\\\\\" },
-    description: "Expertenwissen-Box mit optionalem Titel"
-  },
-  {
-    envName: "exkurs",
-    optionalParam: { format: FormatType.BOLD_ITALIC, separator: "\\\\\\\\" },
-    description: "Exkurs-Box mit optionalem Titel"
-  },
-];
+const ENVIRONMENT_NAMES = ["hinweis", "sprachvgl", "experten", "exkurs"];
 
 /**
  * Generiert RegexPattern für Umgebungen mit optionalem Parameter
+ * Alle haben die gleiche Formatierung: BOLD_ITALIC + Zeilenumbruch
  */
 export function generateEnvironmentPatterns(): RegexPattern[] {
-  return ENVIRONMENT_CONFIGS.map(config => {
-    const targetName = config.targetEnvName || config.envName;
-    
-    return {
-      name: config.envName,
-      regex: new RegExp(`\\\\begin\\{${config.envName}\\}\\[([^\\]]+)\\]`, 'g'),
-      replacement: (_match: string, param: string) => {
-        let result = `\\begin{${targetName}}`;
-        
-        if (config.optionalParam) {
-          const formatted = FORMAT_TO_LATEX[config.optionalParam.format].replace('$1', param);
-          const separator = config.optionalParam.separator || '';
-          result += `\n${formatted}${separator}`;
-        }
-        
-        return result;
-      },
-      description: config.description || `Konvertiert \\begin{${config.envName}}[...] zu div-Block`
-    };
-  });
+  return ENVIRONMENT_NAMES.map(envName => ({
+    name: envName,
+    regex: new RegExp(`\\\\begin\\{${envName}\\}\\[([^\\]]+)\\]`, 'g'),
+    replacement: (_match: string, param: string) => {
+      // Formatiere den Titel als fett-kursiv mit Zeilenumbruch
+      const formatted = `\\textbf{\\emph{${param}}}`;
+      return `\\begin{${envName}}\n${formatted}\\\\\\\\\n`;
+    },
+    description: `Konvertiert \\begin{${envName}}[Titel] zu div-Block mit formatiertem Titel`
+  }));
 }
 
 // ============================================================================
-// KOMPLEXE UMGEBUNGEN (CUSTOM DIV-BOXEN MIT MEHREREN PARAMETERN)
+// KOMPLEXE DIV-BOXEN MIT MEHREREN PARAMETERN
 // ============================================================================
 
 /**
- * Definition für komplexe div-Boxen (wie sttpDefinitionskasten)
+ * Definition für komplexe div-Boxen mit contentBuilder-Funktion
  */
 export interface DivBoxConfig {
   /** Name des LaTeX-Makros (ohne Backslash) */
@@ -282,6 +72,7 @@ export interface DivBoxConfig {
 
 /**
  * Konfiguration für komplexe div-Boxen
+ * Diese haben unterschiedliche Parameter-Anzahlen und spezifische Formatierung
  */
 export const DIV_BOX_CONFIGS: DivBoxConfig[] = [
   {
@@ -371,20 +162,27 @@ export function generateDivBoxPatterns(): RegexPattern[] {
 }
 
 // ============================================================================
-// SPEZIELLE PATTERNS
+// SPEZIELLE PATTERNS (FÜR BRACE-COUNTING IM PREPROCESSOR)
 // ============================================================================
 
 /**
- * Spezielle Patterns die manuelle Verarbeitung benötigen
+ * Patterns die manuelle Verarbeitung mit Brace-Counting benötigen
+ * Diese werden NICHT durch simple Regex ersetzt, sondern im Preprocessor
+ * mit extractBracedContent() oder processMultiParamMacro() verarbeitet
  */
 export const specialPatterns = {
+  /** \textrm{...} - Entfernt Makro, behält Inhalt */
   textrm: /\\textrm\{/g,
+  
+  /** \sttpMindMapText[...]{...} - Entfernt \textbf und \textsf aus Inhalt */
   mindMap: /\\sttpMindMapText(?:\[[^\]]*\])?\{/g,
+  
+  /** \codeRahmenDateiName[label=...]{...}{...} - Multi-Parameter mit Label */
   codeRahmen: /\\codeRahmenDateiName\[label=([^\]]+)\]\{([^}]+)\}\s*\{/g
 };
 
 /**
- * Weitere spezielle Ersetzungen
+ * adjIncludeGraphics - Braucht Replacement-Funktion für optionale Parameter
  */
 export const adjIncludeGraphicsPattern: RegexPattern = {
   name: "adjincludegraphics",
@@ -392,55 +190,8 @@ export const adjIncludeGraphicsPattern: RegexPattern = {
   replacement: (_m: string, optionsWithBrackets: string, _optionsContent: string, filename: string) => {
     return `\\includegraphics${optionsWithBrackets || ''}{${filename}}`;
   },
-  description: "Ersetzt \\adjincludegraphics durch \\includegraphics"
+  description: "Ersetzt \\adjincludegraphics durch \\includegraphics (behält optionale Parameter)"
 };
-
-export const citePattern: RegexPattern = {
-  name: "cite",
-  regex: /\\cite\{([^}]+)\}/g,
-  replacement: "[\\textbf{$1}]",
-  description: "Konvertiert \\cite{} zu [**...**]"
-};
-
-export const citeOptionalPattern: RegexPattern = {
-  name: "citeOptional",
-  regex: /\\cite\[([^\]]+)\]\{([^}]+)\}/g,
-  replacement: "[\\textbf{$2}]",
-  description: "Konvertiert \\cite[]{} zu [**...**]"
-};
-
-//https://de.overleaf.com/learn/latex/Line_breaks_and_blank_spaces#Line_breaks
-export const minisecPattern: RegexPattern = {
-  name: "minisec",
-  regex: /\\minisec\{([^}]*)\}/g,
-  replacement: "\\textbf{\\emph{$1}}\\hfill\\break\n",
-  description: "Konvertiert \\minisec{} zu fett-kursiv mit Zeilenumbruch"
-};
-
-//listInline funktioniert nicht in Tabellen und wird durch texttt{} ersetzt
-export const liwrOptionalPattern: RegexPattern = {
-  name: "liwrOptional",
-  regex: /\\liwr\[([^\]]*)\]\{([^}]*)\}/g,
-  replacement: "\\texttt{$2}",
-  description: "Konvertiert \\liwr[...]{text} zu \\texttt{text}"
-};
-
-//listInline funktioniert nicht in Tabellen und wird durch texttt{} ersetzt
-export const liwrPattern: RegexPattern = {
-  name: "liwr",
-  regex: /\\liwr\{([^}]*)\}/g,
-  replacement: "\\texttt{$1}",
-  description: "Konvertiert \\liwr{text} zu \\texttt{text}"
-};
-
-export const inputReplacements: RegexPattern[] = [
-  {
-    name: "config_listings",
-    regex: /\\input\{config_listings\}/g,
-    replacement: "% config_listings.tex not found - skipped by preprocessor",
-    description: "Ersetzt \\input{config_listings} durch Kommentar"
-  },
-];
 
 // ============================================================================
 // EXPORT ALLER PATTERNS
@@ -451,17 +202,9 @@ export const inputReplacements: RegexPattern[] = [
  */
 export function getAllPatterns() {
   return {
-    simpleMacros: generateSimpleMacroPatterns(),
-    multiParamMacros: generateMultiParamPatterns(),
     environments: generateEnvironmentPatterns(),
     divBoxes: generateDivBoxPatterns(),
     special: specialPatterns,
     adjIncludeGraphics: adjIncludeGraphicsPattern,
-    cite: citePattern,
-    citeOptional: citeOptionalPattern,
-    minisec: minisecPattern,
-    liwr: liwrPattern,
-    liwrOptional: liwrOptionalPattern,
-    inputReplacements: inputReplacements
   };
 }

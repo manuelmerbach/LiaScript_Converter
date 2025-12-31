@@ -11,6 +11,163 @@ interface ProcessingStats {
   errors: string[];
 }
 
+// ============================================================================
+// HILFSFUNKTIONEN FÜR WIEDERVERWENDBARE LOGIK
+// ============================================================================
+
+/**
+ * Extrahiert den Inhalt innerhalb geschweifter Klammern mit Brace-Counting
+ * @param text Der vollständige Text
+ * @param startPos Position NACH der öffnenden Klammer
+ * @returns { content: string, endPos: number } oder null bei Fehler
+ */
+function extractBracedContent(text: string, startPos: number): { content: string; endPos: number } | null {
+  let braceCount = 1;
+  let pos = startPos;
+  let content = "";
+
+  while (pos < text.length && braceCount > 0) {
+    const char = text[pos];
+    
+    // Escape-Sequenzen behandeln
+    if (char === '\\' && pos + 1 < text.length) {
+      const nextChar = text[pos + 1];
+      if (nextChar !== undefined) {
+        if (braceCount > 0) content += char + nextChar;
+        pos += 2;
+        continue;
+      }
+    }
+    
+    if (char === "{") braceCount++;
+    else if (char === "}") braceCount--;
+    
+    if (braceCount > 0) content += char;
+    pos++;
+  }
+
+  if (braceCount !== 0) {
+    return null; // Ungeschlossene Klammern
+  }
+
+  return { content: content, endPos: pos };
+}
+
+/**
+ * Extrahiert mehrere Parameter in geschweiften Klammern
+ * @param text Der vollständige Text
+ * @param startPos Position NACH dem Makronamen
+ * @param paramCount Anzahl zu extrahierender Parameter
+ * @returns { params: string[], endPos: number } oder null bei Fehler
+ */
+function extractParameters(text: string, startPos: number, paramCount: number): { params: string[]; endPos: number } | null {
+  const params: string[] = [];
+  let pos = startPos;
+
+  for (let i = 0; i < paramCount; i++) {
+    // Überspringe Whitespace
+    while (pos < text.length && /\s/.test(text[pos] ?? '')) pos++;
+    
+    if (pos >= text.length || text[pos] !== '{') {
+      return null; // Fehlende öffnende Klammer
+    }
+    
+    pos++; // Öffnende Klammer überspringen
+    
+    const result = extractBracedContent(text, pos);
+    if (!result) {
+      return null; // Fehler beim Extrahieren
+    }
+    
+    params.push(result.content.trim());
+    pos = result.endPos;
+  }
+
+  return { params, endPos: pos };
+}
+
+/**
+ * Verarbeitet ein Makro mit Brace-Counting und optionaler Content-Transformation
+ * @param output Der zu verarbeitende Text
+ * @param regex Das Regex-Pattern für das Makro
+ * @param transformer Funktion zur Transformation des extrahierten Contents
+ * @returns { output: string, count: number }
+ */
+function processBracedMacro(
+  output: string,
+  regex: RegExp,
+  transformer: (content: string) => string
+): { output: string; count: number } {
+  let result = output;
+  let count = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(result)) !== null) {
+    const startIndex = match.index + match[0].length;
+    const extracted = extractBracedContent(result, startIndex);
+    
+    if (!extracted) {
+      console.warn(`Ungeschlossenes Makro ab Position ${match.index}`);
+      break;
+    }
+
+    const transformed = transformer(extracted.content);
+    result =
+      result.substring(0, match.index) +
+      transformed +
+      result.substring(extracted.endPos);
+    
+    regex.lastIndex = match.index;
+    count++;
+  }
+
+  return { output: result, count };
+}
+
+/**
+ * Verarbeitet ein Makro mit mehreren Parametern
+ * @param output Der zu verarbeitende Text
+ * @param regex Das Regex-Pattern für das Makro
+ * @param paramCount Anzahl der Parameter
+ * @param builder Funktion zum Aufbau des Ersetzungstexts
+ * @returns { output: string, count: number }
+ */
+function processMultiParamMacro(
+  output: string,
+  regex: RegExp,
+  paramCount: number,
+  builder: (params: string[]) => string
+): { output: string; count: number } {
+  let result = output;
+  let count = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(result)) !== null) {
+    const startIndex = match.index + match[0].length;
+    const extracted = extractParameters(result, startIndex, paramCount);
+    
+    if (!extracted) {
+      console.warn(`Unvollständiges Makro ab Position ${match.index} (${extracted?.params.length ?? 0}/${paramCount} Parameter)`);
+      break;
+    }
+
+    const replacement = builder(extracted.params);
+    result =
+      result.substring(0, match.index) +
+      replacement +
+      result.substring(extracted.endPos);
+    
+    regex.lastIndex = match.index;
+    count++;
+  }
+
+  return { output: result, count };
+}
+
+// ============================================================================
+// HAUPTVERARBEITUNGSFUNKTION
+// ============================================================================
+
 /**
  * Führt Preprocessing für LaTeX-Dateien durch
  */
@@ -18,91 +175,17 @@ function preprocessLatex(content: string): { processed: string; replacements: nu
   let output = content;
   let replacements = 0;
 
-  // Hole alle Patterns
   const patterns = getAllPatterns();
 
   // 1. --- Entferne \textrm{...} und behalte nur den Inhalt ---
-  const textrm_regex = patterns.special.textrm;
-  let textrm_match: RegExpExecArray | null;
+  const textrm = processBracedMacro(output, patterns.special.textrm, (content) => content);
+  output = textrm.output;
+  replacements += textrm.count;
 
-  while ((textrm_match = textrm_regex.exec(output)) !== null) {
-    const startIndex = textrm_match.index + textrm_match[0].length;
-    let braceCount = 1;
-    let pos = startIndex;
-    let content = "";
-
-    while (pos < output.length && braceCount > 0) {
-      const char = output[pos];
-      if (char === "{") braceCount++;
-      else if (char === "}") braceCount--;
-      if (braceCount > 0) content += char;
-      pos++;
-    }
-
-    if (braceCount === 0) {
-      output =
-        output.substring(0, textrm_match.index) +
-        content +
-        output.substring(pos);
-      textrm_regex.lastIndex = textrm_match.index;
-      replacements++;
-    } else {
-      console.warn("Ungeschlossenes \\textrm ab Position", textrm_match.index);
-    }
-  }
-
-  // 1b. --- Entferne \noindent{...} und behalte nur den Inhalt --- http://www.weinelt.de/latex/noindent.html
-const noindent_regex = /\\noindent\s*\{/g;
-let noindent_match: RegExpExecArray | null;
-
-while ((noindent_match = noindent_regex.exec(output)) !== null) {
-  const startIndex = noindent_match.index + noindent_match[0].length;
-  let braceCount = 1;
-  let pos = startIndex;
-  let content = "";
-
-  while (pos < output.length && braceCount > 0) {
-    const char = output[pos];
-    if (char === "{") braceCount++;
-    else if (char === "}") braceCount--;
-    if (braceCount > 0) content += char;
-    pos++;
-  }
-
-  if (braceCount === 0) {
-    output =
-      output.substring(0, noindent_match.index) +
-      content +
-      output.substring(pos);
-    noindent_regex.lastIndex = noindent_match.index;
-    replacements++;
-  } else {
-    console.warn("Ungeschlossenes \\noindent{ ab Position", noindent_match.index);
-  }
-}
-
-  // 2. --- Wende einfache Makro-Ersetzungen an ---
-  for (const pattern of patterns.simpleMacros) {
-    const beforeLength = output.length;
-    output = output.replace(pattern.regex, (_m, ...groups) => {
-      if (typeof pattern.replacement === 'function') {
-        return pattern.replacement(_m, ...groups);
-      }
-      return pattern.replacement.replace(/\$(\d+)/g, (_, num) => groups[parseInt(num) - 1] || '');
-    });
-    if (output.length !== beforeLength) {
-      replacements++;
-    }
-  }
-
-  // 3. --- Wende Multi-Parameter-Makros an ---
-  for (const pattern of patterns.multiParamMacros) {
-    const beforeLength = output.length;
-    output = output.replace(pattern.regex, pattern.replacement as any);
-    if (output.length !== beforeLength) {
-      replacements++;
-    }
-  }
+  // 1b. --- Entferne \noindent{...} und behalte nur den Inhalt ---
+  const noindent = processBracedMacro(output, /\\noindent\s*\{/g, (content) => content);
+  output = noindent.output;
+  replacements += noindent.count;
 
   // 4. --- Wende Textmakros an (aus text-macros.ts) ---
   for (const macro of textMacros) {
@@ -115,10 +198,6 @@ while ((noindent_match = noindent_regex.exec(output)) !== null) {
 
   // 5. --- adjincludegraphics-Ersetzung ---
   output = output.replace(patterns.adjIncludeGraphics.regex, patterns.adjIncludeGraphics.replacement as any);
-
-  // 5.1 --- liwr Ersetzung ---
-  output = output.replace(patterns.liwrOptional.regex, patterns.liwrOptional.replacement as any);
-  output = output.replace(patterns.liwr.regex, patterns.liwr.replacement as any);
   
   // 6. --- Environment-Patterns (mit optionalen Parametern) ---
   for (const pattern of patterns.environments) {
@@ -129,186 +208,75 @@ while ((noindent_match = noindent_regex.exec(output)) !== null) {
     output = output.replace(pattern.regex, pattern.replacement as string);
   }
 
-  // 7. --- sttpMindMapText - benötigt spezielle Verarbeitung ---
-  const mindMapRegex = patterns.special.mindMap;
-  let mindMapMatch: RegExpExecArray | null;
-
-  while ((mindMapMatch = mindMapRegex.exec(output)) !== null) {
-    const startIndex = mindMapMatch.index + mindMapMatch[0].length;
-    let braceCount = 1;
-    let pos = startIndex;
-    let content = "";
-
-    while (pos < output.length && braceCount > 0) {
-      const char = output[pos];
-      if (char === "{") braceCount++;
-      else if (char === "}") braceCount--;
-      if (braceCount > 0) content += char;
-      pos++;
-    }
-
-    if (braceCount === 0) {
-      // Entferne alle \textbf{...} und \textsf{...} Schichten iterativ
-      let cleanContent = content;
-      let previousContent;
-      do {
-        previousContent = cleanContent;
-        cleanContent = cleanContent.replace(/\\textbf\{(.+?)\}/g, '$1');
-        cleanContent = cleanContent.replace(/\\textsf\{(.+?)\}/g, '$1');
-      } while (cleanContent !== previousContent);
-      
-      output =
-        output.substring(0, mindMapMatch.index) +
-        `\\texttt{${cleanContent}}` +
-        output.substring(pos);
-      mindMapRegex.lastIndex = mindMapMatch.index;
-      replacements++;
-    } else {
-      console.warn("Ungeschlossenes \\sttpMindMapText ab Position", mindMapMatch.index);
-    }
-  }
-
-  // 8. --- sttpKommLitItem - benötigt spezielle Verarbeitung ---
-  const kommLitRegex = /\\sttpKommLitItem/g;
-  let kommLitMatch: RegExpExecArray | null;
-
-  while ((kommLitMatch = kommLitRegex.exec(output)) !== null) {
-    const startIndex = kommLitMatch.index + kommLitMatch[0].length;
-    const params: string[] = [];
-    let pos = startIndex;
+  // 7. --- sttpMindMapText - Entferne \textbf und \textsf ---
+  const mindMap = processBracedMacro(output, patterns.special.mindMap, (content) => {
+    // Entferne alle \textbf{...} und \textsf{...} Schichten iterativ
+    let cleanContent = content;
+    let previousContent;
+    do {
+      previousContent = cleanContent;
+      cleanContent = cleanContent.replace(/\\textbf\{(.+?)\}/g, '$1');
+      cleanContent = cleanContent.replace(/\\textsf\{(.+?)\}/g, '$1');
+    } while (cleanContent !== previousContent);
     
-    for (let i = 0; i < 7; i++) {
-      while (pos < output.length && /\s/.test(output[pos] ?? '')) pos++;
-      
-      if (pos >= output.length || output[pos] !== '{') break;
-      
-      pos++;
-      let braceCount = 1;
-      let param = '';
-      
-      while (pos < output.length && braceCount > 0) {
-        const char = output[pos];
-        if (char === '\\' && pos + 1 < output.length) {
-          const nextChar = output[pos + 1];
-          if (nextChar !== undefined) {
-            param += char + nextChar;
-            pos += 2;
-            continue;
-          }
-        }
-        if (char === '{') braceCount++;
-        else if (char === '}') braceCount--;
-        if (braceCount > 0) param += char;
-        pos++;
-      }
-      
-      params.push(param.trim());
-    }
-    
-    if (params.length === 7) {
-      const author = params[0] ?? '';
-      const year = params[1] ?? '';
-      const title = params[2] ?? '';
-      const cite = params[3] ?? '';
-      const description = params[6] ?? '';
-      
-      let result = `\\begin{KommLitItem}\n\n`;
-      result += `\\emph{${author}} `;
-      result += `\\emph{${year}}. `;
-      result += `\\emph{${title}} `;
-      result += `[\\textbf{${cite}}]\n\n`;
-      result += `${description}\n\n`;
-      result += `\\end{KommLitItem}\n\n`;
-      
-      output =
-        output.substring(0, kommLitMatch.index) +
-        result +
-        output.substring(pos);
-      kommLitRegex.lastIndex = kommLitMatch.index;
-      replacements++;
-    } else {
-      console.warn(`Unvollständiges \\sttpKommLitItem ab Position ${kommLitMatch.index} (${params.length}/7 Parameter)`);
-    }
-  }
+    return `\\texttt{${cleanContent}}`;
+  });
+  output = mindMap.output;
+  replacements += mindMap.count;
 
-  // 9. --- sttpKommLitItemMitFussnote - mit Fußnotentext als 8. Parameter ---
-  const kommLitFnRegex = /\\sttpKommLitItemMitFussnote/g;
-  let kommLitFnMatch: RegExpExecArray | null;
-  
-  while ((kommLitFnMatch = kommLitFnRegex.exec(output)) !== null) {
-    const startIndex = kommLitFnMatch.index + kommLitFnMatch[0].length;
-    const params: string[] = [];
-    let pos = startIndex;
-    
-    for (let i = 0; i < 8; i++) {
-      while (pos < output.length && /\s/.test(output[pos] ?? '')) pos++;
-      
-      if (pos >= output.length || output[pos] !== '{') break;
-      
-      pos++;
-      let braceCount = 1;
-      let param = '';
-      
-      while (pos < output.length && braceCount > 0) {
-        const char = output[pos];
-        if (char === '\\' && pos + 1 < output.length) {
-          const nextChar = output[pos + 1];
-          if (nextChar !== undefined) {
-            param += char + nextChar;
-            pos += 2;
-            continue;
-          }
-        }
-        if (char === '{') braceCount++;
-        else if (char === '}') braceCount--;
-        if (braceCount > 0) param += char;
-        pos++;
-      }
-      
-      params.push(param.trim());
+  // 8. --- sttpKommLitItem (7 Parameter) ---
+  const kommLit = processMultiParamMacro(
+    output,
+    /\\sttpKommLitItem/g,
+    7,
+    (params) => {
+      const [author, year, title, cite, , , description] = params;
+      return [
+        `\\begin{KommLitItem}\n\n`,
+        `\\emph{${author}} `,
+        `\\emph{${year}}. `,
+        `\\emph{${title}} `,
+        `[\\textbf{${cite}}]\n\n`,
+        `${description}\n\n`,
+        `\\end{KommLitItem}\n\n`
+      ].join('');
     }
-    
-    if (params.length === 8) {
-      const author = params[0] ?? '';
-      const year = params[1] ?? '';
-      const title = params[2] ?? '';
-      const cite = params[3] ?? '';
-      const description = params[6] ?? '';
-      const footnote = params[7] ?? '';
-      
-      let result = `\\begin{KommLitItem}\n\n`;
-      result += `\\emph{${author}} `;
-      result += `\\emph{${year}}. `;
-      result += `\\emph{${title}} `;
-      result += `[\\textbf{${cite}}]\\footnote{${footnote}}\n\n`;
-      result += `${description}\n\n`;
-      result += `\\end{KommLitItem}\n\n`;
-      
-      output =
-        output.substring(0, kommLitFnMatch.index) +
-        result +
-        output.substring(pos);
-      kommLitFnRegex.lastIndex = kommLitFnMatch.index;
-      replacements++;
-    } else {
-      console.warn(`Unvollständiges \\sttpKommLitItemMitFussnote ab Position ${kommLitFnMatch.index} (${params.length}/8 Parameter)`);
+  );
+  output = kommLit.output;
+  replacements += kommLit.count;
+
+  // 9. --- sttpKommLitItemMitFussnote (8 Parameter) ---
+  const kommLitFn = processMultiParamMacro(
+    output,
+    /\\sttpKommLitItemMitFussnote/g,
+    8,
+    (params) => {
+      const [author, year, title, cite, , , description, footnote] = params;
+      return [
+        `\\begin{KommLitItem}\n\n`,
+        `\\emph{${author}} `,
+        `\\emph{${year}}. `,
+        `\\emph{${title}} `,
+        `[\\textbf{${cite}}]\\footnote{${footnote}}\n\n`,
+        `${description}\n\n`,
+        `\\end{KommLitItem}\n\n`
+      ].join('');
     }
-  }
+  );
+  output = kommLitFn.output;
+  replacements += kommLitFn.count;
 
   // 10. --- Wende div-Box-Patterns an (Definitionskasten, etc.) ---
   for (const pattern of patterns.divBoxes) {
     output = output.replace(pattern.regex, pattern.replacement as any);
   }
 
-  // 11. --- Cites-Pattern ---
-  output = output.replace(patterns.citeOptional.regex, patterns.citeOptional.replacement as string);
-  output = output.replace(patterns.cite.regex, patterns.cite.replacement as string);
-
-   // 12. --- MiniSec-Pattern ---
-  output = output.replace(patterns.minisec.regex, patterns.minisec.replacement as string);
-
   return { processed: output, replacements };
 }
+
+// ============================================================================
+// DATEI-VERARBEITUNG
+// ============================================================================
 
 /**
  * Durchsucht rekursiv einen Ordner nach .tex-Dateien
@@ -350,7 +318,7 @@ function preprocessTexFile(filePath: string): number {
     content = macroResult.processed;
     totalReplacements += macroResult.replacements;
 
-    // Schritt 2: Ersetze spezielle Blöcke / Problemstellen
+    // Schritt 2: Ersetze spezielle Blöcke / Problemstellen (codeRahmen)
     const patterns = getAllPatterns();
     const regex = patterns.special.codeRahmen;
     let match;
@@ -365,22 +333,13 @@ function preprocessTexFile(filePath: string): number {
       const file = match[2];
       const startPos = match.index + match[0].length;
 
-      let braceCount = 1;
-      let pos = startPos;
-      let caption = "";
-
-      while (pos < content.length && braceCount > 0) {
-        const char = content[pos];
-        if (char === "{") braceCount++;
-        else if (char === "}") braceCount--;
-        if (braceCount > 0) caption += char;
-        pos++;
-      }
-
-      if (braceCount === 0) {
+      const extracted = extractBracedContent(content, startPos);
+      
+      if (extracted) {
+        const caption = extracted.content;
         replacements.push({
           start: match.index,
-          end: pos,
+          end: extracted.endPos,
           replacement: `\\lstinputlisting[language=Go, caption={${caption.replace(
             /~/g,
             " "
@@ -390,6 +349,7 @@ function preprocessTexFile(filePath: string): number {
       }
     }
 
+    // Replacements rückwärts anwenden
     for (let i = replacements.length - 1; i >= 0; i--) {
       const r = replacements[i];
       if (!r) continue;
@@ -397,15 +357,6 @@ function preprocessTexFile(filePath: string): number {
         content.substring(0, r.start) +
         r.replacement +
         content.substring(r.end);
-    }
-
-    // Schritt 3: Input-Ersetzungen
-    for (const pattern of patterns.inputReplacements) {
-      const matches = content.match(pattern.regex);
-      if (matches) {
-        totalReplacements += matches.length;
-      }
-      content = content.replace(pattern.regex, pattern.replacement as string);
     }
     
     // Nach einer Änderung speichern
@@ -422,6 +373,8 @@ function preprocessTexFile(filePath: string): number {
 
 /**
  * Hauptfunktion: verarbeitet alle .tex-Dateien in einem Ordner
+ * 
+ * WICHTIG: Diese Funktion hat die gleiche API wie das Original!
  */
 export function preprocessLatexDirectory(
   directory: string,
@@ -482,25 +435,4 @@ export function preprocessLatexDirectory(
   }
 
   return stats;
-}
-
-// Direkter Aufruf für Tests
-function main(): void {
-  const inputDirectory = "C:\\Uni\\FinalApp\\Input\\Kurstext_Go_Merbach";
-
-  console.log("Starte LaTeX Preprocessing (Modulares System)...\n");
-
-  try {
-    const stats = preprocessLatexDirectory(inputDirectory, {
-      verbose: true,
-    });
-    console.log("\n Preprocessing abgeschlossen!");
-    console.log("Pandoc kann jetzt ausgeführt werden");
-  } catch (error) {
-    console.error("Fehler beim Preprocessing:", error);
-  }
-}
-
-if (require.main === module) {
-  main();
 }
