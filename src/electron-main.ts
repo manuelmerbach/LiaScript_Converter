@@ -73,6 +73,17 @@ ipcMain.handle("select-file", async () => {
   return result.filePaths[0];
 });
 
+// IPC Handler: Pfad zu settings.md abrufen
+ipcMain.handle("get-settings-path", () => {
+  // Ermittle den App-Pfad (funktioniert in Dev und Production)
+  const appPath = app.getAppPath();
+  
+  // Erstelle Pfad zu settings.md im src-Verzeichnis
+  const settingsPath = path.join(appPath, "src", "settings.md");
+  
+  return settingsPath;
+});
+
 // IPC Handler: Pipeline ausführen
 ipcMain.handle("run-pipeline", async (event, config: PipelineConfig) => {
   try {

@@ -18,13 +18,15 @@ interface DivBlockInfo {
  * 
  * @param inputPath Pfad zur Eingabe-Markdown-Datei
  * @param outputPath Pfad zur Ausgabe-Datei
+ * @param mode Konvertierungsmodus ('blockquote' oder 'plain')
  */
 export function fixDivs(
   inputPath: string,
-  outputPath: string
+  outputPath: string,
+  mode: 'blockquote' | 'plain' = 'plain'
 ): void {
   const content = fs.readFileSync(inputPath, "utf-8");
-  const fixed = fixDivBlocks(content);
+  const fixed = fixPandocDivBlocks(content, mode);
   fs.writeFileSync(outputPath, fixed, "utf-8");
 }
 
@@ -114,8 +116,7 @@ function findTopLevelDivBlocks(markdown: string): DivBlockInfo[] {
 }
 
 /**
- * Mapping der Labels, von den Typen die als Blockquote MIT Label dargestellt werden sollen
- * Alle Emojos sind von: https://emojipedia.org/
+ * Mapping der bekannten Typen auf Titel (mit Emoji)
  */
 const BLOCK_TYPE_LABELS: { [key: string]: string } = {
   'hinweis': 'Hinweis ⚠️',
@@ -131,13 +132,14 @@ const BLOCK_TYPE_LABELS: { [key: string]: string } = {
 const BLOCKQUOTE_WITHOUT_LABEL = [
   'universalkasten',
   'tcolorbox',
-  'autorenkasten'
+  'autorenkasten',
+  'picture'
 ];
 
 /**
  * Typen, die als Blockquote MIT Label dargestellt werden
  */
-const BLOCKQUOTE_WITH_LABEL = [
+const SPECIAL_BLOCK_TYPES = [
   'hinweis',
   'sprachvgl',
   'experten',
@@ -160,7 +162,7 @@ const CODE_BLOCK_TYPES = [
  */
 const ALL_KNOWN_DIV_TYPES = [
   ...BLOCKQUOTE_WITHOUT_LABEL,
-  ...BLOCKQUOTE_WITH_LABEL,
+  ...SPECIAL_BLOCK_TYPES,
   ...CODE_BLOCK_TYPES,
 ];
 
@@ -174,12 +176,15 @@ function fixSpanTags(content: string): string {
 /**
  * Konvertiert einen bekannten Div-Block in Markdown
  */
-function convertDivBlock(block: DivBlockInfo): string {
+function convertDivBlock(
+  block: DivBlockInfo,
+  conversionMode: 'blockquote' | 'plain' = 'blockquote'
+): string {
   const blockTypeLower = block.type.toLowerCase();
   let trimmed = block.content.trim();
 
   // Für spezielle Blocks: zusätzliche Formatierung
-  if (BLOCKQUOTE_WITH_LABEL.includes(blockTypeLower)) {
+  if (SPECIAL_BLOCK_TYPES.includes(blockTypeLower)) {
     trimmed = fixSpanTags(trimmed);
   }
 
@@ -221,7 +226,7 @@ function convertDivBlock(block: DivBlockInfo): string {
   }
 
   // → normale Blöcke mit Label
-  if (BLOCKQUOTE_WITH_LABEL.includes(blockTypeLower)) {
+  if (SPECIAL_BLOCK_TYPES.includes(blockTypeLower)) {
     const label = BLOCK_TYPE_LABELS[blockTypeLower] || blockTypeLower;
     const quoted = trimmed
       .split('\n')
@@ -231,14 +236,25 @@ function convertDivBlock(block: DivBlockInfo): string {
     return `> **${label}**\n>\n${quoted}\n\n`;
   }
 
-  // Dieser Punkt sollte nie erreicht werden, da nur bekannte Typen verarbeitet werden
+  // → fallback
+  if (conversionMode === 'blockquote') {
+    const quoted = trimmed
+      .split('\n')
+      .map(line => (line.trim() === '' ? '>' : `> ${line}`))
+      .join('\n');
+    return `${quoted}\n\n`;
+  }
+
   return `${trimmed}\n\n`;
 }
 
 /**
  * Hauptfunktion zum Umwandeln von Div-Blöcken
  */
-export function fixDivBlocks(markdown: string): string {
+export function fixPandocDivBlocks(
+  markdown: string,
+  mode: 'blockquote' | 'plain' = 'plain'
+): string {
 
   markdown = fixKommLitItemDiv(markdown);
 
@@ -262,12 +278,12 @@ export function fixDivBlocks(markdown: string): string {
     }
 
     // Rekursiv verarbeiten, aber NUR innerhalb bekannter Divs
-    const processedContent = fixDivBlocks(block.content);
+    const processedContent = fixPandocDivBlocks(block.content, mode);
 
-    const converted = convertDivBlock({
-      ...block,
-      content: processedContent
-    });
+    const converted = convertDivBlock(
+      { ...block, content: processedContent },
+      mode
+    );
 
     // Block ersetzen
     result =

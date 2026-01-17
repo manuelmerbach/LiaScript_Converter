@@ -16,7 +16,7 @@ export function fixPdf(inputPath: string, outputPath: string) {
   const replaced = content.replace(pdfImageRegex, (_match, alt, pdfPath) => {
     // Erstellt Caption aus Dateiname ohne Endung
     const baseName = path.basename(pdfPath, ".pdf").replace(/[_-]+/g, " ");
-     // Verwendet Caption aus Alt-Text fals vorhanden, andernfalls Dateiname ohne Endung
+     // Verwendet Caption aus Alt-Text falls vorhanden, andernfalls Dateiname ohne Endung
     const caption = (alt?.trim() && alt.trim().toLowerCase() !== "image") 
       ? alt.trim() 
       : baseName;
@@ -40,3 +40,4 @@ export function fixPdf(inputPath: string, outputPath: string) {
 //const outputFile = path.resolve(__dirname, "../Output/dokument1_pdfembedded.md");
 
 //fixPdf(inputFile, outputFile);
+

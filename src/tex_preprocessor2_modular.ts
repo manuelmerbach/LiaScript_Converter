@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { getAllPatterns } from "./regex-patterns-modular";
-import { textMacros } from "./text-macros";
+import { Macros } from "./macros";
 import { getExclusionInfo } from "./excluded-files";
 
 interface ProcessingStats {
@@ -12,11 +12,11 @@ interface ProcessingStats {
 }
 
 // ============================================================================
-// HILFSFUNKTIONEN FÜR WIEDERVERWENDBARE LOGIK
+// HILFSFUNKTIONEN
 // ============================================================================
 
 /**
- * Extrahiert den Inhalt innerhalb geschweifter Klammern mit Brace-Counting
+ * Extrahiert den Inhalt innerhalb geschweifter Klammern mit Klammerzählung
  * @param text Der vollständige Text
  * @param startPos Position NACH der öffnenden Klammer
  * @returns { content: string, endPos: number } oder null bei Fehler
@@ -55,7 +55,7 @@ function extractBracedContent(text: string, startPos: number): { content: string
 
 /**
  * Extrahiert mehrere Parameter in geschweiften Klammern
- * @param text Der vollständige Text
+ * @param text vollständiger Text
  * @param startPos Position NACH dem Makronamen
  * @param paramCount Anzahl zu extrahierender Parameter
  * @returns { params: string[], endPos: number } oder null bei Fehler
@@ -87,7 +87,7 @@ function extractParameters(text: string, startPos: number, paramCount: number): 
 }
 
 /**
- * Verarbeitet ein Makro mit Brace-Counting und optionaler Content-Transformation
+ * Verarbeitet ein Makro mit Klammerzählung und optionaler Content-Transformation
  * @param output Der zu verarbeitende Text
  * @param regex Das Regex-Pattern für das Makro
  * @param transformer Funktion zur Transformation des extrahierten Contents
@@ -164,6 +164,58 @@ function processMultiParamMacro(
   return { output: result, count };
 }
 
+/**
+ * Verarbeitet \codeRahmenDateiName[label=...]{file}{caption} Makros
+ * Extrahiert nur den Dateipfad und überspringt optionale-Parameter
+ * @param output Der zu verarbeitende Text
+ * @returns { output: string, count: number }
+ */
+function processCodeRahmen(output: string): { output: string; count: number } {
+  let result = output;
+  let count = 0;
+  const regex = /\\codeRahmenDateiName\[label=([^\]]+)\]\{([^}]+)\}/g;
+  let match: RegExpExecArray | null;
+  const replacements: Array<{ start: number; end: number; replacement: string }> = [];
+
+  // Sammle alle Ersetzungen
+  while ((match = regex.exec(result)) !== null) {
+    const file = match[2]; // Dateipfad
+    const matchEnd = match.index + match[0].length;
+    
+    // Überspringe Whitespace falls vorhanden
+    let pos = matchEnd;
+    while (pos < result.length && /\s/.test(result[pos] ?? '')) pos++;
+    
+    // Sucht die erste öffnende Klammer
+    if (pos < result.length && result[pos] === '{') {
+      pos++;
+      
+      // Extrahiere caption-Parameter zur Bestimmung der Endpositon
+      const extracted = extractBracedContent(result, pos);
+      
+      if (extracted) {
+        replacements.push({
+          start: match.index,
+          end: extracted.endPos,
+          replacement: `\\lstinputlisting{${file}}`
+        });
+      } else {
+        console.warn(`Ungeschlossene Klammer in codeRahmen ab Position ${match.index}`);
+      }
+    }
+  }
+
+  // Ersetzungen rückwärts anwenden (damit Positionen sich nicht verändern)
+  for (let i = replacements.length - 1; i >= 0; i--) {
+    const r = replacements[i];
+    //if (!r) continue;
+    result = result.substring(0, r.start) + r.replacement + result.substring(r.end);
+    count++;
+  }
+
+  return { output: result, count };
+}
+
 // ============================================================================
 // HAUPTVERARBEITUNGSFUNKTION
 // ============================================================================
@@ -182,24 +234,25 @@ function preprocessLatex(content: string): { processed: string; replacements: nu
   output = textrm.output;
   replacements += textrm.count;
 
-  // 1b. --- Entferne \noindent{...} und behalte nur den Inhalt ---
-  const noindent = processBracedMacro(output, /\\noindent\s*\{/g, (content) => content);
+  // 2. --- Entferne \noindent{...} und behalte nur den Inhalt ---
+  //const noindent = processBracedMacro(output, /\\noindent\s*\{/g, (content) => content);
+  const noindent = processBracedMacro(output, patterns.special.noindent, (content) => content);
   output = noindent.output;
   replacements += noindent.count;
-
-  // 4. --- Wende Textmakros an (aus text-macros.ts) ---
-  for (const macro of textMacros) {
+  
+  // 3. --- Wende Textmakros an (aus macros.ts) ---
+  for (const macro of Macros) {
     const beforeLength = output.length;
     output = output.replace(macro.regex, macro.replacement);
     if (output.length !== beforeLength) {
       replacements++;
     }
   }
-
-  // 5. --- adjincludegraphics-Ersetzung ---
+    
+  // 4. --- adjincludegraphics-Ersetzung ---
   output = output.replace(patterns.adjIncludeGraphics.regex, patterns.adjIncludeGraphics.replacement as any);
   
-  // 6. --- Environment-Patterns (mit optionalen Parametern) ---
+  // 5. --- Environment-Patterns (mit optionalen Parametern) ---
   for (const pattern of patterns.environments) {
     const matches = output.match(pattern.regex);
     if (matches) {
@@ -208,7 +261,7 @@ function preprocessLatex(content: string): { processed: string; replacements: nu
     output = output.replace(pattern.regex, pattern.replacement as string);
   }
 
-  // 7. --- sttpMindMapText - Entferne \textbf und \textsf ---
+  // 6. --- sttpMindMapText - Extrahiert Inhalt und gibt diesen als Inline-Code zurück
   const mindMap = processBracedMacro(output, patterns.special.mindMap, (content) => {
     // Entferne alle \textbf{...} und \textsf{...} Schichten iterativ
     let cleanContent = content;
@@ -224,52 +277,30 @@ function preprocessLatex(content: string): { processed: string; replacements: nu
   output = mindMap.output;
   replacements += mindMap.count;
 
-  // 8. --- sttpKommLitItem (7 Parameter) ---
-  const kommLit = processMultiParamMacro(
-    output,
-    /\\sttpKommLitItem/g,
-    7,
-    (params) => {
-      const [author, year, title, cite, , , description] = params;
-      return [
-        `\\begin{KommLitItem}\n\n`,
-        `\\emph{${author}} `,
-        `\\emph{${year}}. `,
-        `\\emph{${title}} `,
-        `[\\textbf{${cite}}]\n\n`,
-        `${description}\n\n`,
-        `\\end{KommLitItem}\n\n`
-      ].join('');
-    }
-  );
-  output = kommLit.output;
-  replacements += kommLit.count;
+  // 7. --- Verarbeite alle DivBox-Configs mit Klammerzählung ---
+  for (const config of patterns.braceCountingConfigs) {
+    const result = processMultiParamMacro(
+      output,
+      new RegExp(`\\\\${config.macro}`, 'g'),
+      config.paramCount,
+      (params) => {
+        const content = config.contentBuilder(params);
+        return `\\begin{${config.targetEnv}}\n\n${content}\\end{${config.targetEnv}}`;
+      }
+    );
+    output = result.output;
+    replacements += result.count;
+  }
 
-  // 9. --- sttpKommLitItemMitFussnote (8 Parameter) ---
-  const kommLitFn = processMultiParamMacro(
-    output,
-    /\\sttpKommLitItemMitFussnote/g,
-    8,
-    (params) => {
-      const [author, year, title, cite, , , description, footnote] = params;
-      return [
-        `\\begin{KommLitItem}\n\n`,
-        `\\emph{${author}} `,
-        `\\emph{${year}}. `,
-        `\\emph{${title}} `,
-        `[\\textbf{${cite}}]\\footnote{${footnote}}\n\n`,
-        `${description}\n\n`,
-        `\\end{KommLitItem}\n\n`
-      ].join('');
-    }
-  );
-  output = kommLitFn.output;
-  replacements += kommLitFn.count;
-
-  // 10. --- Wende div-Box-Patterns an (Definitionskasten, etc.) ---
+  // 8. --- Wende Box-Patterns an (mit einfachem Regex) ---
   for (const pattern of patterns.divBoxes) {
     output = output.replace(pattern.regex, pattern.replacement as any);
   }
+
+  // 9. --- Verarbeitet codeRahmen Makro ---
+  const codeRahmen = processCodeRahmen(output);
+  output = codeRahmen.output;
+  replacements += codeRahmen.count;
 
   return { processed: output, replacements };
 }
@@ -311,53 +342,11 @@ function preprocessTexFile(filePath: string): number {
   try {
     let content = fs.readFileSync(filePath, "utf8");
     const originalContent = content;
-    let totalReplacements = 0;
 
-    // Schritt 1: Makro-Ersetzungen
+    // Alle Makro-Ersetzungen in einem Schritt
     const macroResult = preprocessLatex(content);
     content = macroResult.processed;
-    totalReplacements += macroResult.replacements;
-
-    // Schritt 2: Ersetze spezielle Blöcke / Problemstellen (codeRahmen)
-    const patterns = getAllPatterns();
-    const regex = patterns.special.codeRahmen;
-    let match;
-    const replacements: Array<{
-      start: number;
-      end: number;
-      replacement: string;
-    }> = [];
-
-    while ((match = regex.exec(content)) !== null) {
-      const label = match[1];
-      const file = match[2];
-      const startPos = match.index + match[0].length;
-
-      const extracted = extractBracedContent(content, startPos);
-      
-      if (extracted) {
-        const caption = extracted.content;
-        replacements.push({
-          start: match.index,
-          end: extracted.endPos,
-          replacement: `\\lstinputlisting[language=Go, caption={${caption.replace(
-            /~/g,
-            " "
-          )}}, label=${label}]{${file}}`,
-        });
-        totalReplacements++;
-      }
-    }
-
-    // Replacements rückwärts anwenden
-    for (let i = replacements.length - 1; i >= 0; i--) {
-      const r = replacements[i];
-      if (!r) continue;
-      content =
-        content.substring(0, r.start) +
-        r.replacement +
-        content.substring(r.end);
-    }
+    const totalReplacements = macroResult.replacements;
     
     // Nach einer Änderung speichern
     if (content !== originalContent) {
@@ -373,8 +362,6 @@ function preprocessTexFile(filePath: string): number {
 
 /**
  * Hauptfunktion: verarbeitet alle .tex-Dateien in einem Ordner
- * 
- * WICHTIG: Diese Funktion hat die gleiche API wie das Original!
  */
 export function preprocessLatexDirectory(
   directory: string,

@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("electronAPI", {
   selectDirectory: () => ipcRenderer.invoke("select-directory"),
   selectFile: () => ipcRenderer.invoke("select-file"),
+  getSettingsPath: () => ipcRenderer.invoke("get-settings-path"),
   runPipeline: (config: any) => ipcRenderer.invoke("run-pipeline", config),
   onProgress: (callback: (progress: any) => void) => {
     ipcRenderer.on("pipeline-progress", (event, progress) => callback(progress));

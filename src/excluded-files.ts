@@ -1,11 +1,43 @@
 /**
- * Definiert, welche .tex-Dateien (Exakte Dateinamen) vom Tex-Preprocessing ausgeschlossen werden sollen.
+ * Lädt Ausschlussliste für .tex-Dateien aus excluded-files.json
+ * Exportiert Funktionen zur Prüfung und Filterung von Dateien
  */
 
-export const excludedFileNames: string[] = [
-  "macros.tex",
-  "makros.tex",
-];
+import fs from "fs";
+import path from "path";
+
+interface ExcludedFileEntry {
+  filename: string;
+  comment?: string;
+}
+
+interface ExcludedFilesConfig {
+  excludedFiles: ExcludedFileEntry[];
+}
+
+/**
+ * Lädt die Ausschlussliste aus der JSON-Konfigurationsdatei
+ */
+function loadExcludedFilesFromJSON(jsonPath: string): string[] {
+  try {
+    const jsonContent = fs.readFileSync(jsonPath, "utf8");
+    const config: ExcludedFilesConfig = JSON.parse(jsonContent);
+    
+    // Extrahiere nur die Dateinamen
+    return config.excludedFiles.map(entry => entry.filename);
+  } catch (error) {
+    console.error(`Fehler beim Laden der excluded-files.json: ${error}`);
+    throw error;
+  }
+}
+
+// Lade Ausschlussliste aus JSON-Datei (im gleichen Verzeichnis wie macros.json)
+const jsonPath = path.join(__dirname, "..", "src", "excluded-files.json");
+
+/**
+ * Export der Ausschlussliste - geladen aus JSON
+ */
+export const excludedFileNames: string[] = loadExcludedFilesFromJSON(jsonPath);
 
 /**
  * Prüft, ob eine Datei ausgeschlossen werden soll

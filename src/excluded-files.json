@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Excluded Files Configuration",
+  "description": "Definiert .tex-Dateien, die vom Preprocessing ausgeschlossen werden sollen",
+  "version": "1.0.0",
+  "excludedFiles": [
+    {
+      "filename": "macros.tex",
+      "comment": "Wird für benutzerdefinierte Makros in Verbindung mit Kurstext_Go.tex verwendet"
+    },
+    {
+      "filename": "makros.tex",
+      "comment": "Wird für benutzerdefinierte Makros in Verbindung mit Kurs_1793.tex verwendet"
+    }
+  ]
+}

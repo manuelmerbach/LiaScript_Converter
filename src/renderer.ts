@@ -4,6 +4,7 @@ interface Window {
     electronAPI: {
         selectDirectory: () => Promise<string | null>;
         selectFile: () => Promise<string | null>;
+        getSettingsPath: () => Promise<string>;
         runPipeline: (config: any) => Promise<any>;
         onProgress: (callback: (progress: any) => void) => void;
     };
@@ -56,7 +57,8 @@ window.startPipeline = async function() {
         document.getElementById('export4').checked,
     ];
 
-    const prependMd = "C:/Uni/FinalApp/src/CodeRunner.md";
+    // Pfad zu settings.md dynamisch vom Main-Prozess abrufen
+    const prependMd = await window.electronAPI.getSettingsPath();
 
     const config = {
         sourceLatexDir: sourceDir,

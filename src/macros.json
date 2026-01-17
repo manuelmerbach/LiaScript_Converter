@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LaTeX-Macros Configuration",
+  "description": "Konfiguration für einfache LaTeX-Makros ohne Verschachtelungen",
+  "version": "1.0.1",
+  "Macros": [
+      {
+      "category": "Scopes entfernen",
+      "macros": [
+    {
+      "name": "scope_beginn",
+      "regex": "^\\s*\\{\\s*%%\\s*Scope beginnen.*$",
+      "flags": "gm",
+      "replacement": "",
+      "description": "Entfernt Zeile mit öffnender Scope-Klammer: { %% Scope beginnen..."
+    },
+    {
+      "name": "scope_ende",
+      "regex": "^\\s*\\}\\s*%%\\s*Scope beenden.*$",
+      "flags": "gm",
+      "replacement": "",
+      "description": "Entfernt Zeile mit schließender Scope-Klammer: } %% Scope beenden"
+    }
+  ]
+    },
+    {
+      "category": "Mathematische Darstellung Logischer Operatoren",
+      "macros": [
+        {
+          "name": "notOp",
+          "regex": "\\\\notOp\\b",
+          "flags": "g",
+          "replacement": "$\\text{NOT}$",
+          "description": "Ersetzt \\notOp durch Math-Inline: $\\text{NOT}$"
+        },
+        {
+          "name": "andOp",
+          "regex": "\\\\andOp\\b",
+          "flags": "g",
+          "replacement": "$\\text{AND}$",
+          "description": "Ersetzt \\andOp durch Math-Inline: $\\text{AND}$"
+        },
+        {
+          "name": "orOp",
+          "regex": "\\\\orOp\\b",
+          "flags": "g",
+          "replacement": "$\\text{OR}$",
+          "description": "Ersetzt \\orOp durch Math-Inline: $\\text{OR}$"
+        },
+        {
+          "name": "xorOp",
+          "regex": "\\\\xorOp\\b",
+          "flags": "g",
+          "replacement": "$\\text{XOR}$",
+          "description": "Ersetzt \\xorOp durch Math-Inline: $\\text{XOR}$"
+        },
+        {
+          "name": "andnotOp",
+          "regex": "\\\\andnotOp\\b",
+          "flags": "g",
+          "replacement": "$\\text{AND NOT}$",
+          "description": "Ersetzt \\andnotOp durch Math-Inline: $\\text{AND NOT}$"
+        }
+      ]
+    },
+    {
+      "category": "Inline-Code",
+      "macros": [
+        {
+          "name": "ffc",
+          "regex": "\\\\ffc\\{([^}]*)\\}",
+          "flags": "g",
+          "replacement": "\\texttt{$1}",
+          "description": "Hervorhebung von Zeichen - \\ffc{} → \\texttt{}"
+        },
+        {
+          "name": "fftt",
+          "regex": "\\\\fftt\\{([^}]*)\\}",
+          "flags": "g",
+          "replacement": "\\texttt{$1}",
+          "description": "Hervorhebung von Zeichen - \\fftt{} → \\texttt{}"
+        },
+        {
+          "name": "ausgabeInline",
+          "regex": "\\\\ausgabeInline\\{([^}]*)\\}",
+          "flags": "g",
+          "replacement": "\\texttt{$1}",
+          "description": "Programmierbeispiele - \\ausgabeInline{} → \\texttt{}"
+        }
+      ]
+    },
+    {
+      "category": "Entfernen von Seitenzeilen",
+      "macros": [
+        {
+          "name": "ntpimde",
+          "regex": "\\\\ntpimde\\{[^}]*\\}\\{[^}]*\\}",
+          "flags": "g",
+          "replacement": "",
+          "description": "Entfernt Seitenzeile - \\ntpimde{}{} → (nichts)"
+        },
+        {
+          "name": "ntpimd",
+          "regex": "\\\\ntpimd\\{[^}]*\\}\\{[^}]*\\}",
+          "flags": "g",
+          "replacement": "",
+          "description": "Entfernt Seitenzeile - \\ntpimd{}{} → (nichts)"
+        }
+      ]
+    },
+    {
+      "category": "Zitate und Referenzen",
+      "macros": [
+        {
+          "name": "cite",
+          "regex": "\\\\cite\\{([^}]+)\\}",
+          "flags": "g",
+          "replacement": "[\\textbf{$1}]",
+          "description": "Konvertiert \\cite{} zu [**...**]"
+        },
+        {
+          "name": "citeOptional",
+          "regex": "\\\\cite\\[([^\\]]+)\\]\\{([^}]+)\\}",
+          "flags": "g",
+          "replacement": "[\\textbf{$2}]",
+          "description": "Konvertiert \\cite[]{} zu [**...**]"
+        },
+        {
+          "name": "begin_refsection",
+          "regex": "\\\\begin\\{refsection\\}(?:\\[([^\\]]*)\\])?",
+          "flags": "g",
+          "replacement": "",
+          "description": "Entfernt \\begin{refsection} mit und ohne optionalem Parameter"
+        },
+        {
+          "name": "end_refsection",
+          "regex": "\\\\end\\{refsection\\}",
+          "flags": "g",
+          "replacement": "",
+          "description": "Entfernt \\end{refsection}"
+        }
+      ]
+    },
+    {
+      "category": "Textformatierung",
+      "macros": [
+        {
+          "name": "minisec",
+          "regex": "\\\\minisec\\{([^}]*)\\}",
+          "flags": "g",
+          "replacement": "\\textbf{\\emph{$1}}\\hfill\\break\n",
+          "description": "Konvertiert \\minisec{} zu fett-kursiv mit Zeilenumbruch"
+        },
+        {
+          "name": "sog",
+          "regex": "\\\\sog\\b",
+          "flags": "g",
+          "replacement": "sog. ",
+          "description": "Ersetzt \\sog durch 'sog. '. Wird oft vor \\emph{} verwendet wodurch Leerzeile fehlt. Andernfalls werden doppelte Leerzeichen ignoriert in Markdown Darstellung"
+        }
+      ]
+    }
+  ]
+}

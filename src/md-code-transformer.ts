@@ -7,7 +7,7 @@ import * as fs from 'fs';
 
 /**
  * Mapping von Sprachen zu LiaScript-Makros
- * Basierend auf der offiziellen LiaScript CodeRunner-Dokumentation
+ * Basierend auf der offiziellen LiaScript CodeRunner-Dokumentation: https://github.com/liascript/CodeRunner
  */
 const LANGUAGE_TO_MACRO: { [key: string]: string } = {
   
@@ -176,7 +176,7 @@ export function addCoderunnerMacros(inputPath: string, outputPath: string): void
     const macro = LANGUAGE_TO_MACRO[language];
     
     if (macro) {
-      // Füge das Makro in einer neuen Zeile nach schließendem ``` hinzu
+      // Fügt das Makro in einer neuen Zeile nach schließendem ``` hinzu
       const newBlock = `${openingLine}${codeContent}${closingBackticks}\n${macro}`;
       
       replacements.push({
@@ -187,7 +187,7 @@ export function addCoderunnerMacros(inputPath: string, outputPath: string): void
     }
   }
   
-  // Von hinten nach vorne ersetzen, damit Indizes korrekt bleiben
+  // Von hinten nach vorne ersetzen, damit Indizes sich nicht ändern
   replacements.sort((a, b) => b.start - a.start);
   
   for (const replacement of replacements) {

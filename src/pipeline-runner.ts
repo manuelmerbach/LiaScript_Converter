@@ -1,6 +1,3 @@
-// HINWEIS: Diese Datei muss in electron-app/ liegen
-// Die Imports müssen auf die Module im übergeordneten Verzeichnis verweisen
-
 import { convertLatexToMarkdown } from "./pandoc_markdown_converter";
 import { fixDivs } from "./fix-pandoc-divs";
 import { addCoderunnerMacros } from "./md-code-transformer";
@@ -45,7 +42,7 @@ export interface PipelineProgress {
 /**
  * Fügt CodeRunner.md am Anfang einer Markdown-Datei ein
  */
-function prependFileToMarkdown(targetFile: string, prependFile: string) {
+function prependFileToLiascript(targetFile: string, prependFile: string) {
   const prependContent = fs.readFileSync(prependFile, "utf8");
   const targetContent = fs.readFileSync(targetFile, "utf8");
   const updated = `${prependContent}\n\n${targetContent}`;
@@ -95,6 +92,7 @@ export async function runPipeline(
   try {
     reportProgress(1, "Erstelle temporären Arbeitsordner");
     
+    // SCHRITT 2: Arbeitsordner erstellen und Dateien kopieren
     tempDir = createTempDirectory("latex-pipeline-");
     await copyDirectory(config.sourceLatexDir, tempDir);
 
@@ -157,7 +155,7 @@ export async function runPipeline(
 
     if (config.skipSteps[2]) {
       reportProgress(6, "Pandoc Div-Blöcke korrigieren");
-      fixDivs(rawMdwMth, fixedDivMd, "plain");
+      fixDivs(rawMdwMth, fixedDivMd);
 
       if (config.outputSteps) {
         const fixedDivMdOutput = path.join(config.outputDir, path.basename(fixedDivMd));
@@ -200,11 +198,11 @@ export async function runPipeline(
       skipStep(transformedMd, transformedMdFn);
     }
     
-    // SCHRITT 9: CODERUNNER.MD VORANSTELLEN
-    reportProgress(9, "CodeRunner.md voranstellen");
+    // SCHRITT 9: LIASCRIPT METADATEN UND CODERUNNER-BIBLIOTHEK VORANSTELLEN
+    reportProgress(9, "settings.md voranstellen");
     
     if (fs.existsSync(config.prependMd)) {
-      prependFileToMarkdown(transformedMdFn, config.prependMd);
+      prependFileToLiascript(transformedMdFn, config.prependMd);
     }
 
     // SCHRITT 10: EXPORT
